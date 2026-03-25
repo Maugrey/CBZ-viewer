@@ -1,0 +1,6 @@
+# Ignore all files in data directory
+data/**
+
+# But keep .gitkeep files and README
+!data/**/.gitkeep
+!data/**/README.md
