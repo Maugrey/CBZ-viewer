@@ -4,3 +4,9 @@ data/**
 # But keep .gitkeep files and README
 !data/**/.gitkeep
 !data/**/README.md
+
+# Ignore generated cache files, but keep the directory stubs
+cache/**
+!cache/.htaccess
+!cache/thumbnails/.gitkeep
+!cache/metadata/.gitkeep
