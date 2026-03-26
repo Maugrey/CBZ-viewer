@@ -36,17 +36,31 @@ Options -Indexes
     ExpiresByType image/gif                "access plus 1 hour"
 </IfModule>
 
-# PHP settings (applied only if mod_php is active — ignored on FastCGI/suPHP)
-<IfModule mod_php.c>
-    php_value memory_limit      256M
-    php_value max_execution_time 60
-    php_flag  display_errors    Off
-    php_flag  zlib.output_compression Off
-</IfModule>
+# PHP settings
+# LiteSpeed LSAPI (Server API: LiteSpeed) lit les php_value/php_flag
+# directement dans .htaccess, sans bloc <IfModule mod_php.c>.
+# Sur Apache+mod_php ces directives fonctionnent aussi nativement.
+php_value memory_limit            512M
+php_value max_execution_time      360
+php_flag  display_errors          Off
+php_flag  display_startup_errors  Off
+php_flag  zlib.output_compression Off
+php_flag  log_errors              On
+php_value error_reporting         32767
+# Chemin relatif à la racine du site — fonctionne sur LiteSpeed et Apache.
+# Si les logs n'apparaissent pas, remplacez par le chemin absolu (non commité).
+php_value error_log               logs/php-errors.log
+# Pour afficher les erreurs dans les pages (debug uniquement) :
+# php_flag  display_errors          On
 
-# Disable output compression for image endpoints (works with mod_php and some FastCGI setups)
-<FilesMatch "^page\.php$">
+# Prevent any encoding or compression for the binary image streaming endpoint
+<FilesMatch "page\.php">
+    # Tell mod_deflate and mod_brotli to skip this response
+    SetEnv no-gzip 1
+    SetEnv no-brotli 1
     <IfModule mod_headers.c>
-        Header set Content-Encoding "identity"
+        # Remove any Content-Encoding header Apache might add
+        Header always unset Content-Encoding
+        Header always unset Transfer-Encoding
     </IfModule>
 </FilesMatch>

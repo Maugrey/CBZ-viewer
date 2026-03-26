@@ -372,7 +372,6 @@ function streamCbzPage(string $filePath, int $zipIndex, string $name): void
     header('Content-Length: ' . strlen($data));
     header('Cache-Control: public, max-age=3600');
     header('Accept-Ranges: none');
-    header('Content-Encoding: identity');
     echo $data;
 }
 

@@ -1,0 +1,4 @@
+# Block all direct HTTP access to log files
+Require all denied
+Order deny,allow
+Deny from all

@@ -10,3 +10,11 @@ cache/**
 !cache/.htaccess
 !cache/thumbnails/.gitkeep
 !cache/metadata/.gitkeep
+
+# Ignore PHP error log but keep the directory stub
+logs/*.log
+logs/*.log.*
+
+# Si vous devez surcharger .htaccess avec des chemins absolus (error_log, etc.),
+# créez un fichier .htaccess.local — jamais commité.
+.htaccess.local
