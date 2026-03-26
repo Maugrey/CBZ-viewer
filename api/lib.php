@@ -13,9 +13,25 @@ declare(strict_types=1);
 // ---------------------------------------------------------------------------
 // Base paths
 // ---------------------------------------------------------------------------
-define('DATA_DIR',  rtrim(realpath(__DIR__ . '/../data') ?: (__DIR__ . '/../data'), '/\\'));
-define('CACHE_DIR', rtrim(__DIR__ . '/../cache', '/\\'));
+
+// Use dirname(__DIR__) to avoid unresolved '..' in paths (important on Windows).
+$_rootDir = dirname(__DIR__);
+
+define('DATA_DIR',  rtrim(
+    str_replace('\\', '/', realpath($_rootDir . '/data') ?: ($_rootDir . '/data')),
+    '/'
+));
+define('CACHE_DIR', rtrim(
+    str_replace('\\', '/', $_rootDir . '/cache'),
+    '/'
+));
 define('SUPPORTED_IMG_EXTS', ['jpg', 'jpeg', 'png', 'webp', 'gif']);
+unset($_rootDir);
+
+/** Normalize a filesystem path to forward slashes + lowercase for comparison. */
+function normPath(string $p): string {
+    return strtolower(str_replace('\\', '/', $p));
+}
 
 // ---------------------------------------------------------------------------
 // PATH VALIDATION
@@ -34,9 +50,8 @@ function validateFilePath(string $file): string|false
     $candidate = DATA_DIR . '/' . $file;
     $real      = realpath($candidate);
     if ($real === false || !is_file($real)) return false;
-    // Strict containment check
-    if (!str_starts_with($real, DATA_DIR . DIRECTORY_SEPARATOR)
-        && !str_starts_with($real, DATA_DIR . '/')) {
+    // Strict containment check — normalize both sides for Windows (case-insensitive, mixed slashes)
+    if (!str_starts_with(normPath($real), normPath(DATA_DIR) . '/')) {
         return false;
     }
     $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));
@@ -54,8 +69,7 @@ function validateSeriesPath(string $series): string|false
     if (empty($series) || in_array($series, ['.', '..'], true)) return false;
     $real = realpath(DATA_DIR . '/' . $series);
     if ($real === false || !is_dir($real)) return false;
-    if (!str_starts_with($real, DATA_DIR . DIRECTORY_SEPARATOR)
-        && !str_starts_with($real, DATA_DIR . '/')) {
+    if (!str_starts_with(normPath($real), normPath(DATA_DIR) . '/')) {
         return false;
     }
     return $real;
@@ -142,10 +156,15 @@ function formatVolumeName(string $filepath): string
 /** Return path relative to data/ (uses forward slashes) */
 function getRelativePath(string $absolutePath): string
 {
-    $base = DATA_DIR;
+    // Normalize both to forward slashes; do a case-insensitive prefix strip (Windows)
     $rel  = str_replace('\\', '/', $absolutePath);
-    $base = str_replace('\\', '/', $base);
-    return ltrim(str_replace($base, '', $rel), '/');
+    $base = str_replace('\\', '/', DATA_DIR);
+    $relLow  = strtolower($rel);
+    $baseLow = strtolower($base);
+    if (str_starts_with($relLow, $baseLow)) {
+        return ltrim(substr($rel, strlen($base)), '/');
+    }
+    return ltrim($rel, '/');
 }
 
 // ---------------------------------------------------------------------------
@@ -325,28 +344,36 @@ function streamPage(string $filePath, int $pageNum): void
 
 function streamCbzPage(string $filePath, int $zipIndex, string $name): void
 {
+    // Ensure no output buffering or compression interferes with binary output
+    @ini_set('zlib.output_compression', '0');
+    while (ob_get_level() > 0) ob_end_clean();
+
     $zip = new ZipArchive();
-    if ($zip->open($filePath) !== true) {
+    $opened = $zip->open($filePath);
+    if ($opened !== true) {
+        error_log('CBZ-Viewer streamCbzPage: ZipArchive::open() failed, code=' . $opened . ' file=' . $filePath);
         http_response_code(500);
         exit();
     }
 
-    $stat   = $zip->statIndex($zipIndex);
-    $stream = $zip->getStreamIndex($zipIndex);
-    if ($stream === false) {
-        $zip->close();
+    $mime = getMimeType($name);
+
+    // getFromIndex() is available since PHP 5.2 (getStreamIndex() requires PHP 8.2+)
+    $data = $zip->getFromIndex($zipIndex);
+    $zip->close();
+
+    if ($data === false || $data === '') {
+        error_log('CBZ-Viewer streamCbzPage: getFromIndex() failed, zipIndex=' . $zipIndex . ' file=' . $filePath);
         http_response_code(500);
         exit();
     }
 
-    header('Content-Type: '   . getMimeType($name));
-    header('Content-Length: ' . $stat['size']);
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . strlen($data));
     header('Cache-Control: public, max-age=3600');
     header('Accept-Ranges: none');
-
-    fpassthru($stream);
-    fclose($stream);
-    $zip->close();
+    header('Content-Encoding: identity');
+    echo $data;
 }
 
 function streamCbrPage(string $filePath, string $name): void

@@ -41,4 +41,12 @@ Options -Indexes
     php_value memory_limit      256M
     php_value max_execution_time 60
     php_flag  display_errors    Off
+    php_flag  zlib.output_compression Off
 </IfModule>
+
+# Disable output compression for image endpoints (works with mod_php and some FastCGI setups)
+<FilesMatch "^page\.php$">
+    <IfModule mod_headers.c>
+        Header set Content-Encoding "identity"
+    </IfModule>
+</FilesMatch>
