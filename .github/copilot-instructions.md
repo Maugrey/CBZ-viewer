@@ -45,7 +45,8 @@ CBZ-viewer/
 │   ├── css/style.css
 │   └── js/reader.js
 ├── .htaccess               ← Rewrite + blocage /data /cache + sécurité
-└── copil-instructions.md
+└── .github/
+    └── copilot-instructions.md
 ```
 
 ---
